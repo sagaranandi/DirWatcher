@@ -1,5 +1,4 @@
-﻿// BackgroundServiceWorker.cs
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -27,6 +26,12 @@ namespace DirWatcher.Services
         private CancellationTokenSource _cancellationTokenSource;
         private bool _isMonitoring;
 
+        /// <summary>
+        /// Constructor for BackgroundServiceWorker.
+        /// </summary>
+        /// <param name="logger">Logger instance.</param>
+        /// <param name="configuration">Configuration instance.</param>
+        /// <param name="serviceScopeFactory">Service scope factory instance.</param>
         public BackgroundServiceWorker(ILogger<BackgroundServiceWorker> logger, IConfiguration configuration, IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -72,26 +77,18 @@ namespace DirWatcher.Services
             _cancellationTokenSource.Cancel();
         }
 
-        /// <summary>
-        /// Processes the directory by comparing files with the previous run and saving the changes to the database.
-        /// </summary>
-        /// <param name="dbContext">The database context.</param>
-        /// <param name="previousRun">The details of the previous run.</param>
-        /// <param name="files">An array of file paths in the directory.</param>
-        /// <returns>A task representing the asynchronous operation.</returns>
+        /// <inheritdoc/>
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    // Retrieve previous run
-                    var previousRun = await GetPreviousRunAsync();
+                    _logger.LogInformation("Monitoring directory: {Directory}", _directory);
 
-                    // Retrieve list of files in the directory
+                    var previousRun = await GetPreviousRunAsync();
                     var files = Directory.GetFiles(_directory);
 
-                    // Process directory if changes detected
                     if (IsChangesDetected(previousRun, files))
                     {
                         using (var scope = _serviceScopeFactory.CreateScope())
@@ -106,7 +103,6 @@ namespace DirWatcher.Services
                     _logger.LogError(ex, "Error processing directory.");
                 }
 
-                // Delay for a specific interval before executing the next iteration
                 await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken);
             }
         }
@@ -143,12 +139,9 @@ namespace DirWatcher.Services
                 currentRun.FilesDeleted.AddRange(filesDeleted);
             }
 
-
-            // Identify modified files
             var modifiedFiles = files.Where(file => IsFileModified(file)).Select(Path.GetFileName).ToList();
             currentRun.FilesModified.AddRange(modifiedFiles);
 
-            // Count occurrences of magic string
             foreach (var file in files)
             {
                 try
@@ -162,7 +155,6 @@ namespace DirWatcher.Services
                 }
             }
 
-            // Save task run details to database
             currentRun.EndTime = DateTime.Now;
             currentRun.Status = "Success";
 
@@ -172,7 +164,6 @@ namespace DirWatcher.Services
 
         private int CountOccurrences(string content, string searchString)
         {
-            // Logic to count occurrences of Magic String in content
             return content.Split(new[] { searchString }, StringSplitOptions.None).Length - 1;
         }
 
@@ -187,7 +178,7 @@ namespace DirWatcher.Services
         private bool IsChangesDetected(TaskRun previousRun, string[] files)
         {
             if (previousRun == null)
-                return true; // Previous run not available, so process directory
+                return true;
 
             var filesBefore = previousRun.FilesAdded;
 

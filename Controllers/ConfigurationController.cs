@@ -2,13 +2,12 @@
 using DirWatcher.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using System;
-using System.Threading.Tasks;
+using System.Linq;
 
 namespace DirWatcher.Controllers
 {
-    
-
     /// <summary>
     /// Controller for configuring directory and magic string settings and managing directory monitoring.
     /// </summary>
@@ -18,6 +17,7 @@ namespace DirWatcher.Controllers
     {
         private readonly IConfiguration _configuration;
         private readonly BackgroundServiceWorker _backgroundServiceWorker;
+        private readonly ILogger<ConfigurationController> _logger;
         private readonly IServiceProvider _serviceProvider;
 
         /// <summary>
@@ -25,18 +25,23 @@ namespace DirWatcher.Controllers
         /// </summary>
         /// <param name="configuration">Configuration instance.</param>
         /// <param name="backgroundServiceWorker">Background service worker instance.</param>
-        public ConfigurationController(IConfiguration configuration, BackgroundServiceWorker backgroundServiceWorker, IServiceProvider serviceProvider)
+        /// <param name="logger">Logger instance.</param>
+        /// <param name="serviceProvider">Service provider instance.</param>
+        public ConfigurationController(IConfiguration configuration, BackgroundServiceWorker backgroundServiceWorker, ILogger<ConfigurationController> logger, IServiceProvider serviceProvider)
         {
             _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
             _backgroundServiceWorker = backgroundServiceWorker ?? throw new ArgumentNullException(nameof(backgroundServiceWorker));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _serviceProvider = serviceProvider;
         }
-        private BackgroundServiceWorker GetPeriodicTaskService()
+
+        private BackgroundServiceWorker GetBackgroundServiceWorker()
         {
             return _serviceProvider.GetServices<IHostedService>()
                 .OfType<BackgroundServiceWorker>()
                 .FirstOrDefault();
         }
+
         /// <summary>
         /// Sets the directory configuration.
         /// </summary>
@@ -47,26 +52,25 @@ namespace DirWatcher.Controllers
         {
             try
             {
-                // Set the directory configuration
+                _logger.LogInformation("Setting directory configuration to {Directory}", directory);
+
                 _configuration["DirWatcher:Directory"] = directory;
-                // Refresh the configuration to pick up changes
                 ((IConfigurationRoot)_configuration).Reload();
-                // Update directory in BackgroundServiceWorker if it's running
-                var backgroundServiceWorker = _serviceProvider.GetService<BackgroundServiceWorker>();
+
+                var backgroundServiceWorker = GetBackgroundServiceWorker();
                 if (backgroundServiceWorker != null)
                 {
                     backgroundServiceWorker.UpdateDirectory(directory);
                 }
+
                 return Ok();
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "An error occurred while setting directory configuration");
                 return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }
-
-     
-
 
         /// <summary>
         /// Sets the magic string configuration.
@@ -78,20 +82,22 @@ namespace DirWatcher.Controllers
         {
             try
             {
-                // Set the magic string configuration
+                _logger.LogInformation("Setting magic string configuration to {MagicString}", magicString);
+
                 _configuration["DirWatcher:MagicString"] = magicString;
-                // Refresh the configuration to pick up changes
                 ((IConfigurationRoot)_configuration).Reload();
-                // Update magic string in BackgroundServiceWorker if it's running
-                var backgroundServiceWorker = _serviceProvider.GetService<BackgroundServiceWorker>();
+
+                var backgroundServiceWorker = GetBackgroundServiceWorker();
                 if (backgroundServiceWorker != null)
                 {
                     backgroundServiceWorker.UpdateMagicString(magicString);
                 }
+
                 return Ok();
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "An error occurred while setting magic string configuration");
                 return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }
@@ -105,11 +111,15 @@ namespace DirWatcher.Controllers
         {
             try
             {
+                _logger.LogInformation("Starting directory monitoring");
+
                 _backgroundServiceWorker.StartMonitoring();
+
                 return Ok();
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "An error occurred while starting directory monitoring");
                 return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }
@@ -123,11 +133,15 @@ namespace DirWatcher.Controllers
         {
             try
             {
+                _logger.LogInformation("Stopping directory monitoring");
+
                 _backgroundServiceWorker.StopMonitoring();
+
                 return Ok();
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "An error occurred while stopping directory monitoring");
                 return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }

@@ -5,6 +5,7 @@ Directory Watcher is a tool that monitors a specific directory for changes and p
 ## Overview
 
 The Directory Watcher project consists of a background service that continuously monitors a directory, detects changes such as file additions, deletions, and modifications, and logs these changes in a database. Additionally, it provides an API for configuring the directory to monitor, the magic string to detect in files, and starting or stopping the monitoring process.
+I have used SQLite DB.
 
 ## Prerequisites
 
