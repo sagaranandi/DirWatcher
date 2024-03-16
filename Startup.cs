@@ -1,3 +1,5 @@
+using DirWatcher.Data;
+using DirWatcher.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
@@ -28,13 +30,15 @@ namespace DirWatcher
             });
             // Add DbContext
             services.AddDbContext<DirWatcherDbContext>(options =>
-            {
-                options.UseSqlServer(Configuration.GetConnectionString("DirWatcher"));
-            }, ServiceLifetime.Scoped);
+            options.UseSqlite(Configuration.GetConnectionString("DefaultConnection")));
 
 
             services.AddControllers();
-            services.AddHostedService<Worker>();
+            services.AddSingleton<BackgroundServiceWorker>();
+            services.AddHostedService<BackgroundServiceWorker>(provider => provider.GetService<BackgroundServiceWorker>());
+           
+
+
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
